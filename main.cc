@@ -8,13 +8,14 @@ Notes
 on windows compile with g++ -std=17 main.cc -lwock32
 
 References 
-http request 
-	https://stackoverflow.com/questions/1011339/how-do-you-make-a-http-request-with-c	
 
-json formatter
-	https://github.com/nlohmann/json
-	or 
-	https://github.com/Tencent/rapidjson/
+Http request 
+https://stackoverflow.com/questions/1011339/how-do-you-make-a-http-request-with-c	
+
+Json formatter
+https://github.com/nlohmann/json
+or 
+https://github.com/Tencent/rapidjson/
 
 */
 
@@ -98,16 +99,20 @@ class tracker{
 	SOCKADDR_IN SockAddr;
 	struct hostent *host;
 
-	inline static const std::string get_request = "GET / HTTP/1.1\r\nHost: ";
+	//inline static const std::string get_request = "GET / HTTPS/1.1\r\nHost: ";
+	inline static const std::string get_request = "GET https://";
 	//inline static const std::string site = "https://api.coingecko.com";
-	inline static const std::string site = "www.google.com"; 
+	inline static const std::string site = "api.coingecko.com";
 	inline static const std::string query = "/api/v3/simple/price?ids=";
+	//inline static const std::string qtail  = "\r\n\r\n";
 
 	std::string querycoinList;
 	std::string currency; 
 	std::string strQry;
-
+ 
 	inline static int tokenCnt;
+	//https port 443, http port 80 
+	inline static const int port = 443; 
 	inline static const int BUF_SZE = 1000;
 	inline static char buffer[BUF_SZE];
 
@@ -121,10 +126,10 @@ class tracker{
 		assets["ethereum"] = std::make_shared<asset>("ethereum", "0", "0");
 
 		tokenCnt = 4;
-		querycoinList = "bitcoin%2Cetheruem%2Cripple%2Csolana"; 
-		currency = "vs_currencies=usd"; 
+		querycoinList = "bitcoin%2Cethereum%2Cripple%2Csolana"; 
+		currency = "&vs_currencies=usd"; 
 
-		strQry = get_request + site + querycoinList + currency;
+		strQry = get_request + site + query + querycoinList + currency;
 		std::cout << "tracker constructer completed" <<std::endl;
 	}
 	
@@ -146,22 +151,20 @@ int tracker::web(){
     if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0){
         std::cout << "WSAStartup failed.\n";
         system("pause");
-        //return 1;
+        return 1;
     }
 
 	Socket=socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	host = gethostbyname(site.c_str()); // host is 0 ...? 
+	host = gethostbyname(site.c_str()); 
 
-	SockAddr.sin_port=htons(80);
+	SockAddr.sin_port=htons(port);
 	SockAddr.sin_family=AF_INET;
 	if(!host){ 
-		//host seems to be 0 for https ... 
 		std::cout << "Error: Host is null" << std::endl; 
 		return 1; 
 	}
 	SockAddr.sin_addr.s_addr = *((unsigned long*)host->h_addr);
-	
-	std::cout << "testing" <<std::endl; 
+
 
 	if(connect(Socket,(SOCKADDR*)(&SockAddr),sizeof(SockAddr)) != 0){
 		std::cout << "Could not connect";
@@ -188,14 +191,16 @@ void tracker::updateAssets(){
 
 	for(;;){
 		try{ 
-			std::cout << "Sent Request\n";
+			std::cout << "\n Sending Request\n";
+			std::cout << "qs: " << strQry << std::endl;
 			// send GET / HTTP
 			send(Socket, strQry.c_str(), strlen(strQry.c_str()), 0);
 
 			//use a json serializer 
 			// recieve html
 			int nDataLength =0;
-			while ((nDataLength = recv(Socket,buffer,BUF_SZE,0)) > 0){        
+			while ((nDataLength = recv(Socket, buffer, BUF_SZE, 0)) > 0){        
+				//std::cout << nDataLength << std::endl;
 				int i = 0;
 				while (buffer[i] >= 32 || buffer[i] == '\n' || buffer[i] == '\r'){
 
@@ -204,9 +209,13 @@ void tracker::updateAssets(){
 					i += 1;
 				}               
 			}
+			std::cout << nDataLength << std::endl;
+			if(nDataLength < 0){ 
+				std::cout << WSAGetLastError() << std::endl;
+			}
 
 			//TEST TEST TEST 
-			std::cout << "Leaving Update Asset" << std::endl;
+			std::cout << "\n<--- Leaving Update Asset" << std::endl;
 			return; 
 			//TEST TEST TEST
 			#if 0		
@@ -257,12 +266,11 @@ int main(){
 	if(t.web()) 
 		return 0 ; 
 
-	std::cout << "Starting threads " << std::endl;
 	std::thread t1(tracker::updateAssets, t); 
-	std::thread t2(tracker::printAssets, t); 
+	//std::thread t2(tracker::printAssets, t); 
 
 	t1.join(); 
-	t2.join(); 
+	//t2.join(); 
 
 	return 0;
 } 
